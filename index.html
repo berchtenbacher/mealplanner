@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meal Planner RPG</title>
+    <title>Meal Plan</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
@@ -119,7 +119,7 @@
     <div class="relative z-10 w-full h-full max-w-md mx-auto p-4 flex flex-col">
         <header class="flex justify-between items-center mb-6 pt-2">
             <div>
-                <h1 class="text-4xl leading-none underline text-white drop-shadow-[2px_2px_0_rgba(0,0,0,1)]">Meal Planner</h1>
+                <h1 class="text-4xl leading-none underline text-white drop-shadow-[2px_2px_0_rgba(0,0,0,1)]">Meal Plan</h1>
             </div>
             <div class="flex gap-2">
                 <button id="mute-btn" onclick="toggleMute()" class="btn-pixel bg-indigo-800 text-white p-3 border-2 border-black">
@@ -146,8 +146,6 @@
         </div>
 
         <div class="p-4 bg-indigo-100 border-b-4 border-indigo-200 shrink-0">
-            <label class="block text-lg mb-1 leading-none">Add New Item</label>
-            
             <div class="flex gap-2 mb-2 items-center">
                 <button id="icon-cycler" onclick="cycleNewIcon()" class="w-12 h-12 bg-white border-2 border-black flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-gray-50 active:translate-y-1">
                     <img id="preview-icon" src="" class="w-8 h-8">
