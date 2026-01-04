@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meal Planner</title>
+    <title>Meal Planner RPG</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <script src="data.js"></script>
-    <link rel="manifest" href="manifest.json">
+
     <style>
         body {
             font-family: 'VT323', monospace;
@@ -74,9 +74,43 @@
             100% { transform: scale(1); }
         }
         .pop-anim { animation: pop 0.2s ease; }
+
+        /* Floating Memo Bubble */
+        .memo-bubble {
+            position: absolute;
+            bottom: 110%; /* Show above button */
+            right: 0;
+            background: #fef3c7; /* Yellow sticky note color */
+            border: 2px solid #000;
+            padding: 0.5rem;
+            width: 200px;
+            z-index: 50;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.2);
+            font-family: sans-serif;
+            font-size: 0.85rem;
+            line-height: 1.3;
+            color: #4b5563;
+            display: none; /* Hidden by default */
+            white-space: normal;
+        }
+        .memo-bubble.show {
+            display: block;
+            animation: pop 0.1s ease;
+        }
+        /* Arrow for bubble */
+        .memo-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 10px;
+            border-width: 6px;
+            border-style: solid;
+            border-color: #000 transparent transparent transparent;
+        }
+
     </style>
 </head>
-<body class="h-screen w-screen overflow-hidden text-gray-900 relative">
+<body class="h-screen w-screen overflow-hidden text-gray-900 relative" onclick="handleBodyClick(event)">
 
     <div class="relative z-10 w-full h-full max-w-md mx-auto p-4 flex flex-col">
         <header class="flex justify-between items-center mb-6 pt-2">
@@ -87,7 +121,6 @@
                 <button id="mute-btn" onclick="toggleMute()" class="btn-pixel bg-indigo-800 text-white p-3 border-2 border-black">
                     <i data-lucide="volume-2" id="mute-icon" class="w-8 h-8"></i>
                 </button>
-                
                 <button onclick="toggleSidebar()" class="btn-pixel bg-indigo-500 hover:bg-indigo-600 text-white p-3 border-2 border-black">
                     <i data-lucide="cooking-pot" class="w-8 h-8"></i>
                 </button>
@@ -95,8 +128,7 @@
         </header>
 
         <main class="glass-panel flex-1 overflow-y-auto p-4 rounded-none">
-            <div id="rotation-list" class="space-y-2">
-                </div>
+            <div id="rotation-list" class="space-y-2"></div>
         </main>
     </div>
 
@@ -109,16 +141,18 @@
         </div>
 
         <div class="p-4 bg-indigo-100 border-b-4 border-indigo-200">
-            <label class="block text-lg mb-1">Add New Item</label>
+            <label class="block text-lg mb-1 leading-none">Add New Item</label>
             
             <div class="flex gap-2 mb-2 items-center">
-                <button id="icon-cycler" onclick="cycleNewIcon()" class="w-12 h-12 bg-white border-2 border-black flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-gray-50 active:translate-y-1" title="Click to change icon">
+                <button id="icon-cycler" onclick="cycleNewIcon()" class="w-12 h-12 bg-white border-2 border-black flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-gray-50 active:translate-y-1">
                     <img id="preview-icon" src="" class="w-8 h-8">
                 </button>
-
-                <input type="text" id="new-meal-name" placeholder="e.g., Lasagna" 
+                <input type="text" id="new-meal-name" placeholder="Name (e.g. Tacos)" 
                     class="flex-1 p-2 border-2 border-black font-sans text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 h-12">
             </div>
+
+            <input type="text" id="new-meal-note" placeholder="Memo or URL (Recipe link...)" 
+                class="w-full p-2 mb-2 border-2 border-black font-sans text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 h-10">
             
             <div class="flex flex-wrap gap-2 mb-2" id="category-selector"></div>
             
@@ -135,35 +169,66 @@
     <div id="overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-40 hidden backdrop-blur-sm"></div>
 
     <audio id="sfx-plop" src="assets/sfx/plop.wav"></audio>
-    <audio id="sfx-scratch" src="assets/sfx/scratch.mp3"></audio>
-    <audio id="sfx-add-rot" src="assets/sfx/add.mp3"></audio>
+    <audio id="sfx-scratch" src="assets/sfx/scratch.wav"></audio>
+    <audio id="sfx-add-rot" src="assets/sfx/add.wav"></audio>
     <audio id="sfx-delete" src="assets/sfx/delete.wav"></audio>
-    <audio id="sfx-success" src="assets/sfx/success.mp3"></audio>
+    <audio id="sfx-success" src="assets/sfx/success.wav"></audio>
 
     <script>
         const CATEGORIES = ['Meal', 'Prep', 'Salad', 'Baking', 'Snack'];
-        
-        let state = {
-            repository: [], 
-            rotation: []
-        };
-
+        let state = { repository: [], rotation: [] };
         let selectedCategory = 'Meal';
         let currentIconIndex = 0; 
+        let isMuted = localStorage.getItem('mealPlannerMuted') === 'true';
+        let activeMemoId = null; // Track which memo is open
 
         document.addEventListener('DOMContentLoaded', () => {
             loadState();
-            lucide.createIcons();
+            updateMuteUI();
             renderCategoryButtons();
             updateIconPreview(); 
             renderAll();
         });
 
-        // --- Logic ---
-
-        function generateId() {
-            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        // --- Global Click Handler for closing Memos ---
+        function handleBodyClick(event) {
+            // If we click outside of a memo button or the memo itself, close active memo
+            if (!event.target.closest('.memo-btn') && !event.target.closest('.memo-bubble')) {
+                closeActiveMemo();
+            }
         }
+
+        function closeActiveMemo() {
+            if (activeMemoId) {
+                const bubble = document.getElementById('memo-' + activeMemoId);
+                if(bubble) bubble.classList.remove('show');
+                activeMemoId = null;
+            }
+        }
+
+        function toggleMemo(event, rotId) {
+            event.stopPropagation(); // Stop click from triggering body click
+            
+            // If clicking the same one, close it
+            if (activeMemoId === rotId) {
+                closeActiveMemo();
+                return;
+            }
+
+            // Close others first
+            closeActiveMemo();
+
+            // Open new one
+            const bubble = document.getElementById('memo-' + rotId);
+            if(bubble) {
+                bubble.classList.add('show');
+                activeMemoId = rotId;
+                playSfx('plop');
+            }
+        }
+
+        // --- Core Functions ---
+        function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
 
         function saveState() {
             localStorage.setItem('mealPlannerState_v2', JSON.stringify(state));
@@ -172,27 +237,33 @@
 
         function loadState() {
             const saved = localStorage.getItem('mealPlannerState_v2');
-            if (saved) {
-                state = JSON.parse(saved);
-            } else {
-                state.repository = [
-                    { id: '1', name: 'Spaghetti', category: 'Meal', iconIndex: 0 },
-                    { id: '2', name: 'Greek Salad', category: 'Salad', iconIndex: 0 },
-                    { id: '3', name: 'Cookies', category: 'Snack', iconIndex: 0 }
-                ];
-            }
+            if (saved) state = JSON.parse(saved);
         }
 
-        // --- Audio Logic ---
-        function playSfx(type) {
-            const audio = document.getElementById('sfx-' + type);
-            if (audio) {
-                audio.volume = 0.2; // <--- 0.2 = 20% volume. Change to 0.5 for 50%, etc.
-                audio.currentTime = 0; 
-                audio.play().catch(e => {
-                    // console.log("Audio blocked/missing");
-                });
+        function updateMuteUI() {
+            const icon = document.getElementById('mute-icon');
+            const btn = document.getElementById('mute-btn');
+            if (isMuted) {
+                icon.setAttribute('data-lucide', 'volume-x');
+                btn.classList.add('bg-red-900'); btn.classList.remove('bg-indigo-800');
+            } else {
+                icon.setAttribute('data-lucide', 'volume-2');
+                btn.classList.add('bg-indigo-800'); btn.classList.remove('bg-red-900');
             }
+            lucide.createIcons();
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            localStorage.setItem('mealPlannerMuted', isMuted);
+            updateMuteUI();
+            if (!isMuted) playSfx('plop');
+        }
+
+        function playSfx(type) {
+            if (isMuted) return;
+            const audio = document.getElementById('sfx-' + type);
+            if (audio) { audio.volume = 0.2; audio.currentTime = 0; audio.play().catch(e => {}); }
         }
 
         function toggleSidebar() {
@@ -207,105 +278,83 @@
             }
         }
 
-        // --- Category & Icon Selection ---
-
         function setCategory(cat) {
-            selectedCategory = cat;
-            currentIconIndex = 0; 
-            renderCategoryButtons();
-            updateIconPreview();
-            playSfx('plop');
+            selectedCategory = cat; currentIconIndex = 0; 
+            renderCategoryButtons(); updateIconPreview(); playSfx('plop');
         }
 
         function cycleNewIcon() {
-            currentIconIndex++;
-            updateIconPreview();
+            currentIconIndex++; updateIconPreview();
             const img = document.getElementById('preview-icon');
-            img.classList.remove('pop-anim');
-            void img.offsetWidth; 
-            img.classList.add('pop-anim');
+            img.classList.remove('pop-anim'); void img.offsetWidth; img.classList.add('pop-anim');
         }
 
         function updateIconPreview() {
             if(typeof getIconUrl === 'function') {
-                const url = getIconUrl(selectedCategory, currentIconIndex);
-                document.getElementById('preview-icon').src = url;
+                document.getElementById('preview-icon').src = getIconUrl(selectedCategory, currentIconIndex);
             }
         }
 
-        // --- CRUD Repository ---
-
         function addToRepository() {
-            const input = document.getElementById('new-meal-name');
-            const name = input.value.trim();
+            const nameIn = document.getElementById('new-meal-name');
+            const noteIn = document.getElementById('new-meal-note');
+            const name = nameIn.value.trim();
             if (!name) return;
 
-            const newItem = {
+            state.repository.push({
                 id: generateId(),
                 name: name,
+                note: noteIn.value.trim(),
                 category: selectedCategory,
                 iconIndex: currentIconIndex 
-            };
+            });
 
-            state.repository.push(newItem);
-            input.value = ''; 
+            nameIn.value = ''; noteIn.value = '';
             currentIconIndex = Math.floor(Math.random() * 5); 
             updateIconPreview();
-            
             saveState();
             playSfx('success');
         }
 
         function deleteFromRepository(id) {
-            // No confirm alert, as requested
             state.repository = state.repository.filter(item => item.id !== id);
-            saveState();
-            playSfx('delete');
+            saveState(); playSfx('delete');
         }
 
         function editRepositoryItem(id) {
             const item = state.repository.find(i => i.id === id);
             const newName = prompt("Edit Meal Name:", item.name);
-            if (newName && newName.trim() !== "") {
-                item.name = newName.trim();
-                saveState();
-            }
+            if (newName === null) return;
+            const newNote = prompt("Edit Note/URL:", item.note || "");
+            
+            item.name = newName.trim() || item.name;
+            item.note = (newNote !== null) ? newNote.trim() : item.note;
+            saveState();
         }
-
-        // --- CRUD Rotation ---
 
         function addToRotation(repoId) {
             const repoItem = state.repository.find(item => item.id === repoId);
             if (!repoItem) return;
-
             state.rotation.push({
                 rotId: generateId(),
-                repoId: repoItem.id,
                 name: repoItem.name,
+                note: repoItem.note,
                 category: repoItem.category,
                 iconIndex: repoItem.iconIndex || 0, 
                 cooked: false
             });
-            saveState();
-            playSfx('add-rot');
+            saveState(); playSfx('add-rot');
         }
 
         function removeFromRotation(rotId) {
             state.rotation = state.rotation.filter(item => item.rotId !== rotId);
-            saveState();
-            playSfx('delete');
+            saveState(); playSfx('delete');
         }
 
         function toggleCooked(rotId) {
             const item = state.rotation.find(i => i.rotId === rotId);
-            if (item) {
-                item.cooked = !item.cooked;
-                saveState();
-                playSfx('scratch');
-            }
+            if (item) { item.cooked = !item.cooked; saveState(); playSfx('scratch'); }
         }
-
-        // --- Render ---
 
         function renderCategoryButtons() {
             const container = document.getElementById('category-selector');
@@ -317,16 +366,19 @@
             `).join('');
         }
 
-        function renderAll() {
-            renderRotation();
-            renderRepository();
-            lucide.createIcons();
+        function renderAll() { renderRotation(); renderRepository(); lucide.createIcons(); }
+
+        function formatNoteContent(note) {
+            if (note.startsWith('http')) {
+                return `<a href="${note}" target="_blank" class="block bg-indigo-500 text-white text-center p-2 rounded hover:bg-indigo-600 font-bold">OPEN LINK</a>`;
+            }
+            return note;
         }
 
         function renderRotation() {
             const container = document.getElementById('rotation-list');
             if (state.rotation.length === 0) {
-                container.innerHTML = `<div class="text-center text-gray-500 mt-10 text-xl"><p>Add meals and snacks to your repository and put them in your current list.</p></div>`;
+                container.innerHTML = `<div class="text-center text-gray-500 mt-10 text-xl"><p>Add items from repository.</p></div>`;
                 return;
             }
 
@@ -336,31 +388,39 @@
                 if (items.length > 0) {
                     html += `<div class="cat-header">${cat}</div>`;
                     items.forEach(item => {
-                        // Safe check for function existance in case data.js didn't load
-                        const iconUrl = (typeof getIconUrl === 'function') 
-                            ? getIconUrl(item.category, item.iconIndex || 0)
-                            : '';
-
+                        const iconUrl = (typeof getIconUrl === 'function') ? getIconUrl(item.category, item.iconIndex || 0) : '';
+                        const hasNote = item.note && item.note.trim() !== "";
+                        
                         html += `
-                        <div class="flex items-center bg-white border-2 border-black p-2 mb-2 shadow-sm ${item.cooked ? 'item-cooked' : ''}">
-                            
+                        <div class="flex items-center bg-white border-2 border-black p-2 mb-2 shadow-sm ${item.cooked ? 'item-cooked' : ''} relative z-0">
                             <button onclick="toggleCooked('${item.rotId}')" class="mr-2 p-1 hover:bg-green-100 rounded">
-                                ${item.cooked 
-                                    ? `<i data-lucide="check-square" class="w-6 h-6 text-green-600"></i>` 
-                                    : `<i data-lucide="square" class="w-6 h-6 text-gray-400"></i>`}
+                                ${item.cooked ? `<i data-lucide="check-square" class="w-6 h-6 text-green-600"></i>` : `<i data-lucide="square" class="w-6 h-6 text-gray-400"></i>`}
                             </button>
-
-                            <div class="w-10 h-10 mr-3 flex-shrink-0 flex items-center justify-center">
-                                <img src="${iconUrl}" class="w-8 h-8">
+                            
+                            <div class="w-10 h-10 mr-3 flex-shrink-0 flex items-center justify-center"><img src="${iconUrl}" class="w-8 h-8"></div>
+                            
+                            <div class="flex-1 min-w-0 leading-tight">
+                                <div class="text-2xl truncate">${item.name}</div>
                             </div>
+                            
+                            <div class="flex items-center gap-2 ml-2 relative">
+                                ${hasNote ? `
+                                    <div class="relative">
+                                        <button onclick="toggleMemo(event, '${item.rotId}')" class="memo-btn btn-pixel bg-yellow-200 p-1.5 border border-black hover:bg-yellow-300">
+                                            <i data-lucide="sticky-note" class="w-4 h-4 text-yellow-800"></i>
+                                        </button>
+                                        
+                                        <div id="memo-${item.rotId}" class="memo-bubble text-left">
+                                            ${formatNoteContent(item.note)}
+                                        </div>
+                                    </div>
+                                ` : ''}
 
-                            <span class="flex-1 text-2xl pt-1 truncate leading-none">${item.name}</span>
-
-                            <button onclick="removeFromRotation('${item.rotId}')" class="text-red-400 hover:text-red-600 ml-2">
-                                <i data-lucide="x" class="w-5 h-5"></i>
-                            </button>
-                        </div>
-                        `;
+                                <button onclick="removeFromRotation('${item.rotId}')" class="text-red-400 hover:text-red-600">
+                                    <i data-lucide="x" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>`;
                     });
                 }
             });
@@ -370,95 +430,30 @@
         function renderRepository() {
             const container = document.getElementById('repo-list');
             let html = '';
-
             CATEGORIES.forEach(cat => {
                 const items = state.repository.filter(i => i.category === cat);
                 if (items.length > 0) {
                     html += `<div class="cat-header">${cat}</div>`;
                     items.forEach(item => {
-                        const iconUrl = (typeof getIconUrl === 'function') 
-                            ? getIconUrl(item.category, item.iconIndex || 0)
-                            : '';
-
+                        const iconUrl = (typeof getIconUrl === 'function') ? getIconUrl(item.category, item.iconIndex || 0) : '';
                         html += `
-                        <div class="flex items-center bg-white border-2 border-black p-2 mb-2 shadow-sm group">
-                            
-                            <div class="w-10 h-10 border-2 border-gray-300 mr-3 flex-shrink-0 bg-gray-50 flex items-center justify-center overflow-hidden">
-                                <img src="${iconUrl}" class="w-8 h-8">
-                            </div>
-
+                        <div class="flex items-center bg-white border-2 border-black p-2 mb-2 shadow-sm">
+                            <div class="w-10 h-10 border-2 border-gray-300 mr-3 flex-shrink-0 bg-gray-50 flex items-center justify-center overflow-hidden"><img src="${iconUrl}" class="w-8 h-8"></div>
                             <div class="flex-1 min-w-0">
-                                <div class="text-xl leading-none pt-1 truncate">${item.name}</div>
+                                <div class="text-xl leading-none truncate">${item.name}</div>
+                                ${item.note ? `<div class="text-[10px] text-gray-400 flex items-center gap-1"><i data-lucide="file-text" class="w-2 h-2"></i> Memo</div>` : ''}
                             </div>
-
                             <div class="flex gap-1 ml-2">
-                                <button onclick="addToRotation('${item.id}')" class="btn-pixel bg-green-100 p-1 border border-black hover:bg-green-200">
-                                    <i data-lucide="plus" class="w-4 h-4 text-green-700"></i>
-                                </button>
-                                <button onclick="editRepositoryItem('${item.id}')" class="btn-pixel bg-yellow-100 p-1 border border-black hover:bg-yellow-200">
-                                    <i data-lucide="edit-2" class="w-4 h-4 text-yellow-700"></i>
-                                </button>
-                                <button onclick="deleteFromRepository('${item.id}')" class="btn-pixel bg-red-100 p-1 border border-black hover:bg-red-200">
-                                    <i data-lucide="trash-2" class="w-4 h-4 text-red-700"></i>
-                                </button>
+                                <button onclick="addToRotation('${item.id}')" class="btn-pixel bg-green-100 p-1 border border-black hover:bg-green-200"><i data-lucide="plus" class="w-4 h-4 text-green-700"></i></button>
+                                <button onclick="editRepositoryItem('${item.id}')" class="btn-pixel bg-yellow-100 p-1 border border-black hover:bg-yellow-200"><i data-lucide="edit-2" class="w-4 h-4 text-yellow-700"></i></button>
+                                <button onclick="deleteFromRepository('${item.id}')" class="btn-pixel bg-red-100 p-1 border border-black hover:bg-red-200"><i data-lucide="trash-2" class="w-4 h-4 text-red-700"></i></button>
                             </div>
-                        </div>
-                        `;
+                        </div>`;
                     });
                 }
             });
-
-            if(html === '') {
-                 container.innerHTML = `<div class="text-center text-gray-500 mt-4"><p>Repo is empty.</p></div>`;
-            } else {
-                container.innerHTML = html;
-            }
+            container.innerHTML = html || `<div class="text-center text-gray-500 mt-4"><p>Repo is empty.</p></div>`;
         }
-
-    let isMuted = localStorage.getItem('mealPlannerMuted') === 'true';
-
-// Run this on load to set the initial icon
-function updateMuteUI() {
-    const icon = document.getElementById('mute-icon');
-    const btn = document.getElementById('mute-btn');
-    if (isMuted) {
-        icon.setAttribute('data-lucide', 'volume-x');
-        btn.classList.replace('bg-indigo-800', 'bg-red-900');
-    } else {
-        icon.setAttribute('data-lucide', 'volume-2');
-        btn.classList.replace('bg-red-900', 'bg-indigo-800');
-    }
-    lucide.createIcons(); // Refresh icons
-}
-
-function toggleMute() {
-    isMuted = !isMuted;
-    localStorage.setItem('mealPlannerMuted', isMuted);
-    updateMuteUI();
-    if (!isMuted) playSfx('plop'); // Little feedback when unmuting
-}
-
-// Update your playSfx function to check the isMuted variable
-function playSfx(type) {
-    if (isMuted) return; // Exit immediately if muted
-
-    const audio = document.getElementById('sfx-' + type);
-    if (audio) {
-        audio.volume = 0.2; 
-        audio.currentTime = 0; 
-        audio.play().catch(e => {});
-    }
-}
-
-// Add updateMuteUI() to your DOMContentLoaded listener
-document.addEventListener('DOMContentLoaded', () => {
-    loadState();
-    updateMuteUI(); // <--- Add this
-    lucide.createIcons();
-    renderCategoryButtons();
-    updateIconPreview(); 
-    renderAll();
-});
     </script>
 </body>
 </html>
