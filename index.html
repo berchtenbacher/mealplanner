@@ -83,9 +83,15 @@
             <div>
                 <h1 class="text-4xl leading-none underline text-white drop-shadow-[2px_2px_0_rgba(0,0,0,1)]">Meal Planner</h1>
             </div>
-            <button onclick="toggleSidebar()" class="btn-pixel bg-indigo-500 hover:bg-indigo-600 text-white p-3 border-2 border-black">
-                <i data-lucide="cooking-pot" class="w-8 h-8"></i>
-            </button>
+            <div class="flex gap-2">
+                <button id="mute-btn" onclick="toggleMute()" class="btn-pixel bg-indigo-800 text-white p-3 border-2 border-black">
+                    <i data-lucide="volume-2" id="mute-icon" class="w-8 h-8"></i>
+                </button>
+                
+                <button onclick="toggleSidebar()" class="btn-pixel bg-indigo-500 hover:bg-indigo-600 text-white p-3 border-2 border-black">
+                    <i data-lucide="cooking-pot" class="w-8 h-8"></i>
+                </button>
+            </div>
         </header>
 
         <main class="glass-panel flex-1 overflow-y-auto p-4 rounded-none">
@@ -408,6 +414,51 @@
                 container.innerHTML = html;
             }
         }
+
+    let isMuted = localStorage.getItem('mealPlannerMuted') === 'true';
+
+// Run this on load to set the initial icon
+function updateMuteUI() {
+    const icon = document.getElementById('mute-icon');
+    const btn = document.getElementById('mute-btn');
+    if (isMuted) {
+        icon.setAttribute('data-lucide', 'volume-x');
+        btn.classList.replace('bg-indigo-800', 'bg-red-900');
+    } else {
+        icon.setAttribute('data-lucide', 'volume-2');
+        btn.classList.replace('bg-red-900', 'bg-indigo-800');
+    }
+    lucide.createIcons(); // Refresh icons
+}
+
+function toggleMute() {
+    isMuted = !isMuted;
+    localStorage.setItem('mealPlannerMuted', isMuted);
+    updateMuteUI();
+    if (!isMuted) playSfx('plop'); // Little feedback when unmuting
+}
+
+// Update your playSfx function to check the isMuted variable
+function playSfx(type) {
+    if (isMuted) return; // Exit immediately if muted
+
+    const audio = document.getElementById('sfx-' + type);
+    if (audio) {
+        audio.volume = 0.2; 
+        audio.currentTime = 0; 
+        audio.play().catch(e => {});
+    }
+}
+
+// Add updateMuteUI() to your DOMContentLoaded listener
+document.addEventListener('DOMContentLoaded', () => {
+    loadState();
+    updateMuteUI(); // <--- Add this
+    lucide.createIcons();
+    renderCategoryButtons();
+    updateIconPreview(); 
+    renderAll();
+});
     </script>
 </body>
 </html>
