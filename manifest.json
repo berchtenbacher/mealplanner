@@ -7,7 +7,7 @@
   "theme_color": "#2d2b55",
   "icons": [
     {
-      "src": "assets/cooking-pot.png",
+      "src": "assets/meals/goulash.png",
       "sizes": "192x192",
       "type": "image/png"
     }
