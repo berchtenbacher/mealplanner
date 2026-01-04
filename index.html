@@ -23,6 +23,11 @@
         ::-webkit-scrollbar-track { background: #2d2b55; }
         ::-webkit-scrollbar-thumb { background: #a5b4fc; border: 2px solid #2d2b55; }
 
+        /* Mobile Smooth Scrolling Fix */
+        .scroll-touch {
+            -webkit-overflow-scrolling: touch;
+        }
+
         .glass-panel {
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(8px);
@@ -78,9 +83,9 @@
         /* Floating Memo Bubble */
         .memo-bubble {
             position: absolute;
-            bottom: 110%; /* Show above button */
+            bottom: 110%; 
             right: 0;
-            background: #fef3c7; /* Yellow sticky note color */
+            background: #fef3c7; 
             border: 2px solid #000;
             padding: 0.5rem;
             width: 200px;
@@ -90,14 +95,13 @@
             font-size: 0.85rem;
             line-height: 1.3;
             color: #4b5563;
-            display: none; /* Hidden by default */
+            display: none; 
             white-space: normal;
         }
         .memo-bubble.show {
             display: block;
             animation: pop 0.1s ease;
         }
-        /* Arrow for bubble */
         .memo-bubble::after {
             content: '';
             position: absolute;
@@ -110,7 +114,7 @@
 
     </style>
 </head>
-<body class="h-screen w-screen overflow-hidden text-gray-900 relative" onclick="handleBodyClick(event)">
+<body class="h-[100dvh] w-screen overflow-hidden text-gray-900 relative" onclick="handleBodyClick(event)">
 
     <div class="relative z-10 w-full h-full max-w-md mx-auto p-4 flex flex-col">
         <header class="flex justify-between items-center mb-6 pt-2">
@@ -127,20 +131,21 @@
             </div>
         </header>
 
-        <main class="glass-panel flex-1 overflow-y-auto p-4 rounded-none">
+        <main class="glass-panel flex-1 overflow-y-auto p-4 rounded-none scroll-touch">
             <div id="rotation-list" class="space-y-2"></div>
         </main>
     </div>
 
-    <aside id="sidebar" class="absolute inset-y-0 right-0 w-full max-w-sm bg-[#f0f9ff] border-l-4 border-black z-50 flex flex-col shadow-2xl">
-        <div class="bg-indigo-600 p-4 border-b-4 border-black flex justify-between items-center">
+    <aside id="sidebar" class="absolute inset-y-0 right-0 w-full max-w-sm bg-[#f0f9ff] border-l-4 border-black z-50 flex flex-col shadow-2xl h-full">
+        
+        <div class="bg-indigo-600 p-4 border-b-4 border-black flex justify-between items-center shrink-0">
             <h2 class="text-2xl text-white">Meal Collection</h2>
             <button onclick="toggleSidebar()" class="text-white hover:text-indigo-200">
                 <i data-lucide="x" class="w-8 h-8"></i>
             </button>
         </div>
 
-        <div class="p-4 bg-indigo-100 border-b-4 border-indigo-200">
+        <div class="p-4 bg-indigo-100 border-b-4 border-indigo-200 shrink-0">
             <label class="block text-lg mb-1 leading-none">Add New Item</label>
             
             <div class="flex gap-2 mb-2 items-center">
@@ -161,7 +166,7 @@
             </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-4 bg-[#fff1f2]">
+        <div class="flex-1 overflow-y-auto p-4 pb-24 bg-[#fff1f2] scroll-touch overscroll-contain">
             <div id="repo-list" class="space-y-4"></div>
         </div>
     </aside>
@@ -180,7 +185,7 @@
         let selectedCategory = 'Meal';
         let currentIconIndex = 0; 
         let isMuted = localStorage.getItem('mealPlannerMuted') === 'true';
-        let activeMemoId = null; // Track which memo is open
+        let activeMemoId = null; 
 
         document.addEventListener('DOMContentLoaded', () => {
             loadState();
@@ -190,9 +195,7 @@
             renderAll();
         });
 
-        // --- Global Click Handler for closing Memos ---
         function handleBodyClick(event) {
-            // If we click outside of a memo button or the memo itself, close active memo
             if (!event.target.closest('.memo-btn') && !event.target.closest('.memo-bubble')) {
                 closeActiveMemo();
             }
@@ -207,18 +210,12 @@
         }
 
         function toggleMemo(event, rotId) {
-            event.stopPropagation(); // Stop click from triggering body click
-            
-            // If clicking the same one, close it
+            event.stopPropagation(); 
             if (activeMemoId === rotId) {
                 closeActiveMemo();
                 return;
             }
-
-            // Close others first
             closeActiveMemo();
-
-            // Open new one
             const bubble = document.getElementById('memo-' + rotId);
             if(bubble) {
                 bubble.classList.add('show');
@@ -227,7 +224,6 @@
             }
         }
 
-        // --- Core Functions ---
         function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
 
         function saveState() {
